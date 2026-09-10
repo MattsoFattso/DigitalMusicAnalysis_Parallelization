@@ -12,6 +12,8 @@ using System.Numerics;
 using NAudio.Wave;
 using System.Xml;
 
+using System.Diagnostics;
+
 
 namespace DigitalMusicAnalysis
 {
@@ -35,16 +37,28 @@ namespace DigitalMusicAnalysis
             filename = openFile("Select Audio (wav) file");
             string xmlfile = openFile("Select Score (xml) file");
             Thread check = new Thread(new ThreadStart(updateSlider));
+
             // start timer
+
+            Stopwatch timer = Stopwatch.StartNew();
+
             loadWave(filename);
             freqDomain();
             sheetmusic = readXML(xmlfile);
-            onsetDetection();
+            onsetDetection();  /// Contains Maindow FFT and also String Match components
+
             // stop timer
-            loadImage();
-            loadHistogram();
-            playBack();
-            check.Start();
+
+            timer.Stop();
+
+
+            File.AppendAllText(
+          "benchmark.txt",
+          $"Sequential,{timer.Elapsed.TotalMilliseconds:F3}\n");
+            //loadImage();
+            // loadHistogram();
+            //playBack();
+            //check.Start();
 
             button1.Click += zoomIN;
             button2.Click += zoomOUT;
@@ -486,18 +500,32 @@ namespace DigitalMusicAnalysis
 
             // STAFF TAB DISPLAY
 
+            displayStaff(
+    alignedNoteArray,
+    alignedStaffArray,
+    sheetBrush,
+    ErrorBrush);
+
+
+
+        }
+
+        private void displayStaff(
+    musicNote[] alignedNoteArray,
+    musicNote[] alignedStaffArray,
+    SolidColorBrush sheetBrush,
+    SolidColorBrush ErrorBrush)
+        {
             Ellipse[] notes;
             Line[] stems;
+
             notes = new Ellipse[alignedNoteArray.Length];
             stems = new Line[alignedNoteArray.Length];
-            SolidColorBrush myBrush = new SolidColorBrush(Colors.Green);
 
             RotateTransform rotate = new RotateTransform(45);
 
             for (int ii = 0; ii < alignedNoteArray.Length; ii++)
             {
-                //noteArray[ii] = new musicNote(pitches[ii], lengths[ii]);
-                //System.Console.Out.Write("Note " + (ii + 1) + ": \nDuration: " + noteArray[ii].duration / waveIn.SampleRate + " seconds \nPitch: " + Enum.GetName(typeof(musicNote.notePitch), (noteArray[ii].pitch) % 12) + " / " + pitches[ii] + "\nError: " + noteArray[ii].error * 100 + "%\n");
                 notes[ii] = new Ellipse();
                 notes[ii].Tag = alignedNoteArray[ii];
                 notes[ii].Height = 20;
@@ -506,36 +534,45 @@ namespace DigitalMusicAnalysis
                 notes[ii].LayoutTransform = rotate;
                 notes[ii].MouseEnter += DisplayStats;
                 notes[ii].MouseLeave += ClearStats;
+
                 stems[ii] = new Line();
                 stems[ii].StrokeThickness = 1;
                 stems[ii].X1 = ii * 30 + 20;
                 stems[ii].X2 = ii * 30 + 20;
                 stems[ii].Y1 = 250 - 10 * alignedNoteArray[ii].staffPos;
                 stems[ii].Y2 = 250 - 10 * alignedNoteArray[ii].staffPos - 40;
+
                 notes[ii].Fill = ErrorBrush;
                 notes[ii].StrokeThickness = 1;
                 stems[ii].Stroke = ErrorBrush;
 
+                Canvas.SetTop(
+                    notes[ii],
+                    240 - 10 * alignedNoteArray[ii].staffPos);
 
-                Canvas.SetTop(notes[ii], (240 - 10 * alignedNoteArray[ii].staffPos));
                 if (alignedNoteArray[ii].flat)
                 {
-                    System.Windows.Controls.Label flat = new System.Windows.Controls.Label();
+                    Label flat = new Label();
+
                     flat.Content = "b";
                     flat.FontFamily = new FontFamily("Mistral");
                     flat.Margin = new Thickness(ii * 30 + 15, 0, 0, 0);
-                    Canvas.SetTop(flat, (240 - 10 * alignedNoteArray[ii].staffPos));
+
+                    Canvas.SetTop(
+                        flat,
+                        240 - 10 * alignedNoteArray[ii].staffPos);
+
                     noteStaff.Children.Insert(ii, flat);
                 }
 
                 noteStaff.Children.Insert(ii, notes[ii]);
                 noteStaff.Children.Insert(ii, stems[ii]);
-
             }
 
             Ellipse[] sheetNotes;
             Rectangle[] timeRect;
             Line[] sheetStems;
+
             sheetNotes = new Ellipse[alignedStaffArray.Length];
             sheetStems = new Line[alignedStaffArray.Length];
             timeRect = new Rectangle[2 * alignedStaffArray.Length];
@@ -547,10 +584,8 @@ namespace DigitalMusicAnalysis
             Eline.Width = alignedStaffArray.Length * 30;
             noteStaff.Width = alignedStaffArray.Length * 30;
 
-
             for (int ii = 0; ii < alignedStaffArray.Length; ii++)
             {
-
                 sheetNotes[ii] = new Ellipse();
                 sheetNotes[ii].Tag = alignedStaffArray[ii];
                 sheetNotes[ii].Height = 20;
@@ -559,6 +594,7 @@ namespace DigitalMusicAnalysis
                 sheetNotes[ii].LayoutTransform = rotate;
                 sheetNotes[ii].MouseEnter += DisplayStats;
                 sheetNotes[ii].MouseLeave += ClearStats;
+
                 sheetStems[ii] = new Line();
                 sheetStems[ii].StrokeThickness = 1;
                 sheetStems[ii].X1 = ii * 30 + 20;
@@ -570,52 +606,77 @@ namespace DigitalMusicAnalysis
                 sheetNotes[ii].StrokeThickness = 1;
                 sheetStems[ii].Stroke = sheetBrush;
 
+                Canvas.SetTop(
+                    sheetNotes[ii],
+                    240 - 10 * alignedStaffArray[ii].staffPos);
 
-                Canvas.SetTop(sheetNotes[ii], (240 - 10 * alignedStaffArray[ii].staffPos));
                 if (alignedStaffArray[ii].flat)
                 {
-                    System.Windows.Controls.Label flat = new System.Windows.Controls.Label();
+                    Label flat = new Label();
+
                     flat.Content = "b";
                     flat.FontFamily = new FontFamily("Mistral");
                     flat.Margin = new Thickness(ii * 30 + 15, 0, 0, 0);
-                    Canvas.SetTop(flat, (240 - 10 * alignedStaffArray[ii].staffPos));
+
+                    Canvas.SetTop(
+                        flat,
+                        240 - 10 * alignedStaffArray[ii].staffPos);
+
                     noteStaff.Children.Insert(ii, flat);
                 }
+
                 noteStaff.Children.Insert(ii, sheetNotes[ii]);
                 noteStaff.Children.Insert(ii, sheetStems[ii]);
             }
 
-            // FOR TIMING ERROR RECTANGLES
+            // Timing error rectangles
 
             for (int ii = 0; ii < alignedStaffArray.Length; ii++)
             {
-
                 timeRect[ii] = new Rectangle();
+
                 timeRect[ii].Fill = sheetBrush;
-                timeRect[ii].Height = 10 * alignedStaffArray[ii].duration * 4 * bpm / (60 * waveIn.SampleRate);
+                timeRect[ii].Height =
+                    10 * alignedStaffArray[ii].duration * 4 * bpm /
+                    (60 * waveIn.SampleRate);
+
                 timeRect[ii].Width = 15;
-                timeRect[ii].Margin = new Thickness(ii * 30 + 5, 0, 0, 0);
+                timeRect[ii].Margin =
+                    new Thickness(ii * 30 + 5, 0, 0, 0);
 
                 Canvas.SetTop(timeRect[ii], 200);
 
                 noteStaff.Children.Insert(ii, timeRect[ii]);
-
             }
 
-            for (int ii = alignedStaffArray.Length; ii < alignedStaffArray.Length + alignedNoteArray.Length; ii++)
+            for (
+                int ii = alignedStaffArray.Length;
+                ii < alignedStaffArray.Length + alignedNoteArray.Length;
+                ii++)
             {
-
                 timeRect[ii] = new Rectangle();
+
                 timeRect[ii].Fill = ErrorBrush;
-                timeRect[ii].Height = 10 * alignedNoteArray[ii - alignedStaffArray.Length].duration * 4 * bpm / (60 * waveIn.SampleRate);
+
+                timeRect[ii].Height =
+                    10 *
+                    alignedNoteArray[ii - alignedStaffArray.Length].duration *
+                    4 * bpm /
+                    (60 * waveIn.SampleRate);
+
                 timeRect[ii].Width = 10;
-                timeRect[ii].Margin = new Thickness((ii - alignedStaffArray.Length) * 30 + 5, 0, 0, 0);
+
+                timeRect[ii].Margin =
+                    new Thickness(
+                        (ii - alignedStaffArray.Length) * 30 + 5,
+                        0,
+                        0,
+                        0);
 
                 Canvas.SetTop(timeRect[ii], 200);
+
                 noteStaff.Children.Insert(ii, timeRect[ii]);
             }
-
-
         }
 
         private void DisplayStats(object sender, System.Windows.Input.MouseEventArgs e)
