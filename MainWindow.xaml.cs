@@ -35,8 +35,10 @@ namespace DigitalMusicAnalysis
         public MainWindow()
         {
             InitializeComponent();
-            filename = openFile("Select Audio (wav) file");
-            string xmlfile = openFile("Select Score (xml) file");
+
+            filename = @"C:\Users\matty\OneDrive\Documents\UNIVERSITY\Year 3 Sem 2\CAB401 Paralell Computing\MAIN PROJECT\CODE\music\Jupiter.wav";
+
+            string xmlfile = @"C:\Users\matty\OneDrive\Documents\UNIVERSITY\Year 3 Sem 2\CAB401 Paralell Computing\MAIN PROJECT\CODE\music\Jupiter.xml";
 
             // start timer
 
@@ -52,6 +54,9 @@ namespace DigitalMusicAnalysis
 
             timer.Stop();
 
+
+            Console.WriteLine(
+                $"Elapsed Time: {timer.Elapsed.TotalMilliseconds:F3} ms");
 
             File.AppendAllText(
           "benchmark.txt",
@@ -363,8 +368,56 @@ namespace DigitalMusicAnalysis
 
                 Y = new Complex[nearest];
 
-                Y = fft(compX, nearest);
+                // COMPARE APPROACHES FOR ERROR
 
+                //Stopwatch recursiveTimer = Stopwatch.StartNew();
+
+                //Complex[] recursive = fft(compX, nearest);
+
+                //recursiveTimer.Stop();
+
+
+                //Stopwatch iterativeTimer = Stopwatch.StartNew();
+
+                Complex[] iterative = fft_Iterative(compX);
+
+                //iterativeTimer.Stop();
+
+
+                ////Console.WriteLine(
+                ////    $"Recursive FFT: {recursiveTimer.Elapsed.TotalMilliseconds:F4} ms");
+
+                //Console.WriteLine(
+                //    $"Iterative FFT: {iterativeTimer.Elapsed.TotalMilliseconds:F4} ms");
+
+
+                double maxAbsoluteError = 0;
+                double maxRelativeError = 0;
+
+                //for (int k = 0; k < recursive.Length; k++)
+                //{
+                //    double error =
+                //        Complex.Abs(recursive[k] - iterative[k]);
+
+                //    maxAbsoluteError = Math.Max(maxAbsoluteError, error);
+
+                //    double magnitude = Complex.Abs(recursive[k]);
+
+                //    if (magnitude > 1e-12)
+                //    {
+                //        double relativeError = error / magnitude;
+                //        maxRelativeError =
+                //            Math.Max(maxRelativeError, relativeError);
+                //    }
+                //}
+
+                //Console.WriteLine(
+                //    $"Max absolute error: {maxAbsoluteError:E}");
+
+                //Console.WriteLine(
+                //    $"Max relative error: {maxRelativeError:E}");
+
+                Y = iterative;
                 absY = new double[nearest];
 
                 double maximum = 0;
@@ -465,13 +518,13 @@ namespace DigitalMusicAnalysis
                 }
             }
 
-            // STAFF TAB DISPLAY
+    //        // STAFF TAB DISPLAY
 
-            displayStaff(
-    alignedNoteArray,
-    alignedStaffArray,
-    sheetBrush,
-    ErrorBrush);
+    //        displayStaff(
+    //alignedNoteArray,
+    //alignedStaffArray,
+    //sheetBrush,
+    //ErrorBrush);
 
 
 
@@ -745,7 +798,7 @@ namespace DigitalMusicAnalysis
             playback.Dispose();
         }
 
-        // FFT function for Pitch Detection
+        // FFT function for Pitch Detection (THIS IS THE RECURSIVE APPRAOCH)
 
         private Complex[] fft(Complex[] x, int L)
         {
@@ -790,6 +843,79 @@ namespace DigitalMusicAnalysis
             }
 
             return Y;
+        }
+
+        // Iterative radix-2 FFT for pitch detection
+        private Complex[] fft_Iterative(Complex[] x)
+        {
+            int N = x.Length;
+
+            // FFT requires a power-of-two input size
+            if (N == 0 || (N & (N - 1)) != 0)
+            {
+                throw new ArgumentException(
+                    "FFT input length must be a power of two.");
+            }
+
+            // Copy input so original data is not modified
+            Complex[] data = new Complex[N];
+
+            int bits = (int)Math.Log(N, 2);
+
+            // Bit-reversal permutation
+            for (int i = 0; i < N; i++)
+            {
+                int reversed = ReverseBits(i, bits);
+                data[reversed] = x[i];
+            }
+
+            // Process FFT one stage at a time
+            for (int size = 2; size <= N; size *= 2)
+            {
+                int halfSize = size / 2;
+
+                // Process each group within this stage
+                for (int start = 0; start < N; start += size)
+                {
+                    for (int j = 0; j < halfSize; j++)
+                    {
+                        double angle =
+                            -2.0 * Math.PI * j / size;
+
+                        Complex twiddle = new Complex(
+                            Math.Cos(angle),
+                            Math.Sin(angle));
+
+                        int evenIndex = start + j;
+                        int oddIndex = evenIndex + halfSize;
+
+                        Complex even = data[evenIndex];
+                        Complex odd =
+                            data[oddIndex] * twiddle;
+
+                        // Butterfly operation
+                        data[evenIndex] = even + odd;
+                        data[oddIndex] = even - odd;
+                    }
+                }
+            }
+
+            return data;
+        }
+
+        private int ReverseBits(int value, int bits)
+        {
+            int reversed = 0;
+
+            for (int i = 0; i < bits; i++)
+            {
+                reversed =
+                    (reversed << 1) | (value & 1);
+
+                value >>= 1;
+            }
+
+            return reversed;
         }
 
         private musicNote[] readXML(string filename)
@@ -1133,10 +1259,10 @@ namespace DigitalMusicAnalysis
                 jj = jj - 1;
             }
 
-            System.Console.Out.Write("\n\n----------------  String Matching ------------------\n\n");
+            //System.Console.Out.Write("\n\n----------------  String Matching ------------------\n\n");
 
-            System.Console.Out.Write(AlignA + "\n");
-            System.Console.Out.Write(AlignB + "\n");
+            //System.Console.Out.Write(AlignA + "\n");
+            //System.Console.Out.Write(AlignB + "\n");
 
             string[] returnArray = new string[2];
 
