@@ -1,5 +1,8 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Numerics;
+using System.Threading.Tasks;
+using System.IO;
 
 namespace DigitalMusicAnalysis
 {
@@ -48,10 +51,20 @@ namespace DigitalMusicAnalysis
                 timeFreqData[jj] = new float[cols];
             }
 
-            timeFreqData = stft(compX, wSamp);
-	
-        }
+            Stopwatch stftTimer = Stopwatch.StartNew();
 
+            timeFreqData = stft(compX, wSamp);
+
+            stftTimer.Stop();
+
+            File.AppendAllText(
+                "stft_parallel_4_core.txt",
+                $"{stftTimer.Elapsed.TotalMilliseconds:F3} ms{Environment.NewLine}");
+            double elapsedMs = stftTimer.Elapsed.TotalMilliseconds;
+            Console.WriteLine($"STFT Time: {elapsedMs:F3} ms");
+
+
+        }
         float[][] stft(Complex[] x, int wSamp)
         {
             int ii = 0;
@@ -60,14 +73,14 @@ namespace DigitalMusicAnalysis
             int ll = 0;
             int N = x.Length;
             float fftMax = 0;
-            
+
             float[][] Y = new float[wSamp / 2][];
 
             for (ll = 0; ll < wSamp / 2; ll++)
             {
                 Y[ll] = new float[2 * (int)Math.Floor((double)N / (double)wSamp)];
             }
-            
+
             Complex[] temp = new Complex[wSamp];
             Complex[] tempFFT = new Complex[wSamp];
 
@@ -97,6 +110,72 @@ namespace DigitalMusicAnalysis
             for (ii = 0; ii < 2 * Math.Floor((double)N / (double)wSamp) - 1; ii++)
             {
                 for (kk = 0; kk < wSamp / 2; kk++)
+                {
+                    Y[kk][ii] /= fftMax;
+                }
+            }
+
+            return Y;
+        }
+        float[][] parallell_stft(Complex[] x, int wSamp)
+        {
+            int ll = 0;
+            int N = x.Length;           
+            float[][] Y = new float[wSamp / 2][];
+
+            for (ll = 0; ll < wSamp / 2; ll++)
+            {
+                Y[ll] = new float[2 * (int)Math.Floor((double)N / (double)wSamp)];
+            }
+
+            int numberOfWindows =
+              2 * (int)Math.Floor((double)N / (double)wSamp) - 1;
+
+            ParallelOptions options = new ParallelOptions
+            {
+                MaxDegreeOfParallelism = 4
+            };
+
+
+            // STEP 1: Process each STFT window in parallel
+            Parallel.For(0, numberOfWindows, options, ii =>
+            {
+                // Each worker gets its own arrays
+                Complex[] temp = new Complex[wSamp];
+
+                for (int jj = 0; jj < wSamp; jj++)
+                {
+                    temp[jj] = x[ii * (wSamp / 2) + jj];
+                }
+
+                Complex[] tempFFT = fft(temp);
+
+                // Each worker writes to its own column of Y
+                for (int kk = 0; kk < wSamp / 2; kk++)
+                {
+                    Y[kk][ii] = (float)Complex.Abs(tempFFT[kk]);
+                }
+            });
+
+
+            // STEP 2: Find maximum AFTER parallel processing
+            float fftMax = 0;
+
+            for (int ii = 0; ii < numberOfWindows; ii++)
+            {
+                for (int kk = 0; kk < wSamp / 2; kk++)
+                {
+                    if (Y[kk][ii] > fftMax)
+                    {
+                        fftMax = Y[kk][ii];
+                    }
+                }
+            }
+
+
+            for (int ii = 0; ii < 2 * Math.Floor((double)N / (double)wSamp) - 1; ii++)
+            {
+                for (int kk = 0; kk < wSamp / 2; kk++)
                 {
                     Y[kk][ii] /= fftMax;
                 }

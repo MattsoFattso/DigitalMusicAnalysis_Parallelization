@@ -1,0 +1,31 @@
+Sequential,1702.574
+Sequential,1662.871
+Sequential,1655.094
+Sequential,1509.486
+Sequential,1604.047
+Sequential,1868.777
+Sequential,1712.208
+Sequential,1642.005
+Sequential,1883.139
+Sequential,1967.533
+Sequential,1736.020
+Sequential,1737.238
+Sequential,1669.574
+Sequential,1718.145
+Sequential,1575.438
+Sequential,1525.392
+Sequential,1713.900
+Sequential Mathematical Component,1799.626
+
+
+
+Sequential Mathematical Component,1653.379
+Sequential Mathematical Component,1521.036
+Sequential Mathematical Component,1627.927
+Sequential Mathematical Component,1557.945
+Sequential Mathematical Component,1559.526
+Sequential Mathematical Component,1644.414
+Sequential Mathematical Component,1546.870
+Sequential Mathematical Component,1656.568
+Sequential Mathematical Component,1493.781
+Sequential Mathematical Component,1531.324

@@ -1,15 +1,18 @@
-﻿using System;
+﻿using NAudio.Wave;
+using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Numerics;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Timers;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
-using System.IO;
-using System.Threading;
-using System.Numerics;
-using NAudio.Wave;
 using System.Xml;
 
 
@@ -23,7 +26,6 @@ namespace DigitalMusicAnalysis
         private float[] pixelArray;
         private musicNote[] sheetmusic;
         private WaveOut playback; // = new WaveOut();
-        private Complex[] twiddles;
         private Complex[] compX;
         private string filename;
         private enum pitchConv { C, Db, D, Eb, E, F, Gb, G, Ab, A, Bb, B };
@@ -31,50 +33,38 @@ namespace DigitalMusicAnalysis
 
         public MainWindow()
         {
-            InitializeComponent();
-            filename = openFile("Select Audio (wav) file");
-            string xmlfile = openFile("Select Score (xml) file");
-            Thread check = new Thread(new ThreadStart(updateSlider));
-            // start timer
-            loadWave(filename);
-<<<<<<< Updated upstream
-=======
+                InitializeComponent();
 
+               // filename = openFile("Select Audio (wav) file");
+               // string xmlfile = openFile("Select Score (xml) file");
 
-            Stopwatch timer = Stopwatch.StartNew();
+                filename = @"C:\Users\matty\OneDrive\Documents\UNIVERSITY\Year 3 Sem 2\CAB401 Paralell Computing\MAIN PROJECT\CODE\music\Jupiter.wav";
 
->>>>>>> Stashed changes
-            freqDomain();
-            sheetmusic = readXML(xmlfile);
-            onsetDetection();
-            // stop timer
-<<<<<<< Updated upstream
-            loadImage();
-            loadHistogram();
-            playBack();
-            check.Start();
-=======
+                string xmlfile = @"C:\Users\matty\OneDrive\Documents\UNIVERSITY\Year 3 Sem 2\CAB401 Paralell Computing\MAIN PROJECT\CODE\music\Jupiter.xml";
 
-            timer.Stop();
+                  loadWave(filename);
 
-            File.AppendAllText(
-                "benchmark.txt",
-                $"Sequential Mathematical Component,{timer.Elapsed.TotalMilliseconds:F3}\n");
+                Stopwatch timer = Stopwatch.StartNew();
 
-            Console.WriteLine(
-                $"Sequential MATHEMATICAL COMPONENT: {timer.Elapsed.TotalMilliseconds:F3} ms");
-            //loadImage();
-            // loadHistogram();
-            //playBack();
-            //check.Start();
->>>>>>> Stashed changes
+                freqDomain();
+                sheetmusic = readXML(xmlfile);
+                onsetDetection();
 
-            //button1.Click += zoomIN;
-            //button2.Click += zoomOUT;
+                timer.Stop();
 
-            //slider1.ValueChanged += updateHistogram;
-            //playback.PlaybackStopped += closeMusic;
-        }
+                Console.WriteLine(
+                    $"FULL MATHEMATICAL COMPONENT: {timer.Elapsed.TotalMilliseconds:F3} ms");
+                //loadImage();
+                // loadHistogram();
+                //playBack();
+                //check.Start();
+
+                //button1.Click += zoomIN;
+                //button2.Click += zoomOUT;
+
+                //slider1.ValueChanged += updateHistogram;
+                //playback.PlaybackStopped += closeMusic;
+            }
 
         // Loads time-freq image for tab 1
 
@@ -306,21 +296,18 @@ namespace DigitalMusicAnalysis
             float[] HFC;
             int starts = 0;
             int stops = 0;
-            Complex[] Y;
-            double[] absY;
             List<int> lengths;
             List<int> noteStarts;
             List<int> noteStops;
-            List<double> pitches;
 
-            int ll;
+            int zll;
             double pi = 3.14159265;
             Complex i = Complex.ImaginaryOne;
 
             noteStarts = new List<int>(100);
             noteStops = new List<int>(100);
             lengths = new List<int>(100);
-            pitches = new List<double>(100);
+        
 
             SolidColorBrush sheetBrush = new SolidColorBrush(Colors.Black);
             SolidColorBrush ErrorBrush = new SolidColorBrush(Colors.Red);
@@ -371,87 +358,211 @@ namespace DigitalMusicAnalysis
             }
 
 
-            // DETERMINES START AND FINISH TIME OF NOTES BASED ON ONSET DETECTION       
-
-            ///*
+            // DETERMINES START AND FINISH TIME OF NOTES BASED ON ONSET DETECTION
 
             for (int ii = 0; ii < noteStops.Count; ii++)
             {
                 lengths.Add(noteStops[ii] - noteStarts[ii]);
             }
 
-            for (int mm = 0; mm < lengths.Count; mm++)
+
+            // DETERMINES START AND FINISH TIME OF NOTES BASED ON ONSET DETECTION       
+
+            double[] pitches = new double[lengths.Count];
+
+            
+
+            ParallelOptions options = new ParallelOptions
             {
-                int nearest = (int)Math.Pow(2, Math.Ceiling(Math.Log(lengths[mm], 2)));
-                twiddles = new Complex[nearest];
-                for (ll = 0; ll < nearest; ll++)
+                MaxDegreeOfParallelism = 4
+            };
+
+            Console.WriteLine($"noteStarts.Count = {noteStarts.Count}");
+            Console.WriteLine($"noteStops.Count  = {noteStops.Count}");
+            Console.WriteLine($"lengths.Count    = {lengths.Count}");
+            Console.WriteLine($"pitches.Length   = {pitches.Length}");
+
+            Stopwatch onsetDetection_timer = Stopwatch.StartNew();
+
+    
+
+            Parallel.For(0, lengths.Count, options, mm =>
+            {
+                int nearest = (int)Math.Pow(
+                    2,
+                    Math.Ceiling(Math.Log(lengths[mm], 2)));
+
+                // Local twiddle array - unique to this note
+                Complex[] localTwiddles = new Complex[nearest];
+
+                for (int ll = 0; ll < nearest; ll++)
                 {
                     double a = 2 * pi * ll / (double)nearest;
-                    twiddles[ll] = Complex.Pow(Complex.Exp(-i), (float)a);
+
+                    localTwiddles[ll] =
+                        Complex.Pow(Complex.Exp(-i), (float)a);
                 }
 
-                compX = new Complex[nearest];
+                // Local FFT input - unique to this note
+                Complex[] localCompX = new Complex[nearest];
+
                 for (int kk = 0; kk < nearest; kk++)
                 {
-                    if (kk < lengths[mm] && (noteStarts[mm] + kk) < waveIn.wave.Length)
+                    if (kk < lengths[mm] &&
+                        (noteStarts[mm] + kk) < waveIn.wave.Length)
                     {
-                        compX[kk] = waveIn.wave[noteStarts[mm] + kk];
+                        localCompX[kk] =
+                            waveIn.wave[noteStarts[mm] + kk];
                     }
                     else
                     {
-                        compX[kk] = Complex.Zero;
+                        localCompX[kk] = Complex.Zero;
                     }
                 }
 
-                Y = new Complex[nearest];
+                // FFT result is also local
+                Complex[] localY =
+                    fft(localCompX, nearest, localTwiddles);
 
-                Y = fft(compX, nearest);
-
-                absY = new double[nearest];
+                // Magnitudes are local
+                double[] localAbsY = new double[nearest];
 
                 double maximum = 0;
                 int maxInd = 0;
 
-                for (int jj = 0; jj < Y.Length; jj++)
+                for (int jj = 0; jj < localY.Length; jj++)
                 {
-                    absY[jj] = Y[jj].Magnitude;
-                    if (absY[jj] > maximum)
+                    localAbsY[jj] = localY[jj].Magnitude;
+
+                    if (localAbsY[jj] > maximum)
                     {
-                        maximum = absY[jj];
+                        maximum = localAbsY[jj];
                         maxInd = jj;
                     }
                 }
 
+                // Existing harmonic correction
                 for (int div = 6; div > 1; div--)
                 {
-
                     if (maxInd > nearest / 2)
                     {
-                        if (absY[(int)Math.Floor((double)(nearest - maxInd) / div)] / absY[(maxInd)] > 0.10)
+                        if (localAbsY[
+                                (int)Math.Floor(
+                                    (double)(nearest - maxInd) / div)]
+                            / localAbsY[maxInd] > 0.10)
                         {
                             maxInd = (nearest - maxInd) / div;
                         }
                     }
                     else
                     {
-                        if (absY[(int)Math.Floor((double)maxInd / div)] / absY[(maxInd)] > 0.10)
+                        if (localAbsY[
+                                (int)Math.Floor(
+                                    (double)maxInd / div)]
+                            / localAbsY[maxInd] > 0.10)
                         {
                             maxInd = maxInd / div;
                         }
                     }
                 }
 
+                // Unique output index - no pitches.Add()
                 if (maxInd > nearest / 2)
                 {
-                    pitches.Add((nearest - maxInd) * waveIn.SampleRate / nearest);
+                    pitches[mm] =
+                        (nearest - maxInd) *
+                        waveIn.SampleRate /
+                        nearest;
                 }
                 else
                 {
-                    pitches.Add(maxInd * waveIn.SampleRate / nearest);
+                    pitches[mm] =
+                        maxInd *
+                        waveIn.SampleRate /
+                        nearest;
                 }
+            });
+
+            onsetDetection_timer.Stop();
+
+            Console.WriteLine(
+                $"ONSET DETECTION COMPONENT: {onsetDetection_timer.Elapsed.TotalMilliseconds:F3} ms");
 
 
-            }
+
+
+            //for (int mm = 0; mm < lengths.Count; mm++)
+            //{
+            //    int nearest = (int)Math.Pow(2, Math.Ceiling(Math.Log(lengths[mm], 2)));
+            //    twiddles = new Complex[nearest];
+            //    for (ll = 0; ll < nearest; ll++)
+            //    {
+            //        double a = 2 * pi * ll / (double)nearest;
+            //        twiddles[ll] = Complex.Pow(Complex.Exp(-i), (float)a);
+            //    }
+
+            //    compX = new Complex[nearest];
+            //    for (int kk = 0; kk < nearest; kk++)
+            //    {
+            //        if (kk < lengths[mm] && (noteStarts[mm] + kk) < waveIn.wave.Length)
+            //        {
+            //            compX[kk] = waveIn.wave[noteStarts[mm] + kk];
+            //        }
+            //        else
+            //        {
+            //            compX[kk] = Complex.Zero;
+            //        }
+            //    }
+
+            //    Y = new Complex[nearest];
+
+            //    Y = fft(compX, nearest);
+
+            //    absY = new double[nearest];
+
+            //    double maximum = 0;
+            //    int maxInd = 0;
+
+            //    for (int jj = 0; jj < Y.Length; jj++)
+            //    {
+            //        absY[jj] = Y[jj].Magnitude;
+            //        if (absY[jj] > maximum)
+            //        {
+            //            maximum = absY[jj];
+            //            maxInd = jj;
+            //        }
+            //    }
+
+            //    for (int div = 6; div > 1; div--)
+            //    {
+
+            //        if (maxInd > nearest / 2)
+            //        {
+            //            if (absY[(int)Math.Floor((double)(nearest - maxInd) / div)] / absY[(maxInd)] > 0.10)
+            //            {
+            //                maxInd = (nearest - maxInd) / div;
+            //            }
+            //        }
+            //        else
+            //        {
+            //            if (absY[(int)Math.Floor((double)maxInd / div)] / absY[(maxInd)] > 0.10)
+            //            {
+            //                maxInd = maxInd / div;
+            //            }
+            //        }
+            //    }
+
+            //    if (maxInd > nearest / 2)
+            //    {
+            //        pitches.Add((nearest - maxInd) * waveIn.SampleRate / nearest);
+            //    }
+            //    else
+            //    {
+            //        pitches.Add(maxInd * waveIn.SampleRate / nearest);
+            //    }
+
+
+            //}
 
             musicNote[] noteArray;
             noteArray = new musicNote[noteStarts.Count()];
@@ -509,8 +620,6 @@ namespace DigitalMusicAnalysis
 
             // STAFF TAB DISPLAY
 
-<<<<<<< Updated upstream
-=======
     //        displayStaff(
     //alignedNoteArray,
     //alignedStaffArray,
@@ -527,7 +636,6 @@ namespace DigitalMusicAnalysis
     SolidColorBrush sheetBrush,
     SolidColorBrush ErrorBrush)
         {
->>>>>>> Stashed changes
             Ellipse[] notes;
             Line[] stems;
             notes = new Ellipse[alignedNoteArray.Length];
@@ -761,7 +869,7 @@ namespace DigitalMusicAnalysis
 
         // FFT function for Pitch Detection
 
-        private Complex[] fft(Complex[] x, int L)
+        private Complex[] fft(Complex[] x, int L, Complex[] twiddles)
         {
             int ii = 0;
             int kk = 0;
@@ -794,8 +902,8 @@ namespace DigitalMusicAnalysis
                     }
                 }
 
-                E = fft(even, L);
-                O = fft(odd, L);
+                E = fft(even, L, twiddles);
+                O = fft(odd, L, twiddles);
 
                 for (kk = 0; kk < N; kk++)
                 {
