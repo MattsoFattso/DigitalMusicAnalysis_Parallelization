@@ -17,7 +17,8 @@ using System.Xml;
 
 
 namespace DigitalMusicAnalysis
-{
+{   
+    //PARALLEL BRANCH FOR METHOD 1 and 2
     public partial class MainWindow : Window
     {
         private WaveFileReader waveReader;
