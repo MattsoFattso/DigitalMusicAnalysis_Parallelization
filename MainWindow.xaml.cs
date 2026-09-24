@@ -30,19 +30,20 @@ namespace DigitalMusicAnalysis
         private string filename;
         private enum pitchConv { C, Db, D, Eb, E, F, Gb, G, Ab, A, Bb, B };
         private double bpm = 70;
-
+           
+        // RESTRUCTURING FFT TO A ITERATIVE METHOD
         public MainWindow()
         {
             InitializeComponent();
             filename = openFile("Select Audio (wav) file");
             string xmlfile = openFile("Select Score (xml) file");
-            Thread check = new Thread(new ThreadStart(updateSlider));
 
             // start timer
 
+            loadWave(filename);
+
             Stopwatch timer = Stopwatch.StartNew();
 
-            loadWave(filename);
             freqDomain();
             sheetmusic = readXML(xmlfile);
             onsetDetection();  /// Contains Maindow FFT and also String Match components
@@ -55,43 +56,9 @@ namespace DigitalMusicAnalysis
             File.AppendAllText(
           "benchmark.txt",
           $"Sequential,{timer.Elapsed.TotalMilliseconds:F3}\n");
-            //loadImage();
-            // loadHistogram();
-            //playBack();
-            //check.Start();
-
-            button1.Click += zoomIN;
-            button2.Click += zoomOUT;
-
-            slider1.ValueChanged += updateHistogram;
-            playback.PlaybackStopped += closeMusic;
-        }
-
-        // Loads time-freq image for tab 1
-
-        private void loadImage()
-        {
-
-            float fs = waveIn.SampleRate;
-            float divisor = fs / stftRep.wSamp;
-
-            int rows = stftRep.wSamp / 2;
-            int cols = stftRep.timeFreqData[0].Length;
-
-            slider1.Maximum = cols - 1;
-
-            int croppedHeight = 3520 * stftRep.wSamp / (int)fs;
-
-            showImage.Height = croppedHeight;
-            showImage.Width = cols;
-
-            BitmapSource bmpSrc = BitmapSource.Create(cols, croppedHeight, 96, 96, PixelFormats.Gray32Float, null, pixelArray, 4 * cols);
-            showImage.Source = bmpSrc;
-
-            var scaler = (ScaleTransform)showImage.LayoutTransform;
-            scaler.ScaleY = 600 / (double)croppedHeight;
 
         }
+
 
         // Loads Histogram for tab 2
 
