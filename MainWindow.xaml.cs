@@ -36,13 +36,14 @@ namespace DigitalMusicAnalysis
             InitializeComponent();
             filename = openFile("Select Audio (wav) file");
             string xmlfile = openFile("Select Score (xml) file");
-            Thread check = new Thread(new ThreadStart(updateSlider));
+
+            loadWave(filename);
+
 
             // start timer
 
             Stopwatch timer = Stopwatch.StartNew();
 
-            loadWave(filename);
             freqDomain();
             sheetmusic = readXML(xmlfile);
             onsetDetection();  /// Contains Maindow FFT and also String Match components
@@ -53,18 +54,13 @@ namespace DigitalMusicAnalysis
 
 
             File.AppendAllText(
-          "benchmark.txt",
+          "Sequential Timing.txt",
           $"Sequential,{timer.Elapsed.TotalMilliseconds:F3}\n");
             //loadImage();
             // loadHistogram();
             //playBack();
             //check.Start();
 
-            button1.Click += zoomIN;
-            button2.Click += zoomOUT;
-
-            slider1.ValueChanged += updateHistogram;
-            playback.PlaybackStopped += closeMusic;
         }
 
         // Loads time-freq image for tab 1
