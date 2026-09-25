@@ -11,9 +11,14 @@ namespace DigitalMusicAnalysis
         public float[][] timeFreqData;
         public int wSamp;
         public Complex[] twiddles;
+        private int WorkerCount;
 
         public timefreq(float[] x, int windowSamp)
         {
+            // DEFINE Parallel Worker Coutn for This Code
+
+            WorkerCount = 2;
+
             int ii;
             double pi = 3.14159265;
             Complex i = Complex.ImaginaryOne;
@@ -53,15 +58,13 @@ namespace DigitalMusicAnalysis
 
             Stopwatch stftTimer = Stopwatch.StartNew();
 
-            timeFreqData = stft(compX, wSamp);
+            timeFreqData = parallel_stft(compX, wSamp);
 
             stftTimer.Stop();
 
-            File.AppendAllText(
-                "stft_parallel_4_core.txt",
-                $"{stftTimer.Elapsed.TotalMilliseconds:F3} ms{Environment.NewLine}");
+
             double elapsedMs = stftTimer.Elapsed.TotalMilliseconds;
-            Console.WriteLine($"STFT Time: {elapsedMs:F3} ms");
+            Console.WriteLine($"Parallel STFT Time: {elapsedMs:F3} ms");
 
 
         }
@@ -117,7 +120,7 @@ namespace DigitalMusicAnalysis
 
             return Y;
         }
-        float[][] parallell_stft(Complex[] x, int wSamp)
+        float[][] parallel_stft(Complex[] x, int wSamp)
         {
             int ll = 0;
             int N = x.Length;           
@@ -133,7 +136,7 @@ namespace DigitalMusicAnalysis
 
             ParallelOptions options = new ParallelOptions
             {
-                MaxDegreeOfParallelism = 4
+                MaxDegreeOfParallelism = WorkerCount
             };
 
 

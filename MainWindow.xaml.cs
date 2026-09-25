@@ -29,11 +29,16 @@ namespace DigitalMusicAnalysis
         private WaveOut playback; // = new WaveOut();
         private Complex[] compX;
         private string filename;
+        private int WorkerCount;
         private enum pitchConv { C, Db, D, Eb, E, F, Gb, G, Ab, A, Bb, B };
         private double bpm = 70;
 
         public MainWindow()
         {
+            // Worker Count For Parallel Components
+
+            WorkerCount = 2;
+
                 InitializeComponent();
 
                // filename = openFile("Select Audio (wav) file");
@@ -43,7 +48,7 @@ namespace DigitalMusicAnalysis
 
                 string xmlfile = @"C:\Users\matty\OneDrive\Documents\UNIVERSITY\Year 3 Sem 2\CAB401 Paralell Computing\MAIN PROJECT\CODE\music\Jupiter.xml";
 
-                  loadWave(filename);
+                loadWave(filename);
 
                 Stopwatch timer = Stopwatch.StartNew();
 
@@ -55,16 +60,7 @@ namespace DigitalMusicAnalysis
 
                 Console.WriteLine(
                     $"FULL MATHEMATICAL COMPONENT: {timer.Elapsed.TotalMilliseconds:F3} ms");
-                //loadImage();
-                // loadHistogram();
-                //playBack();
-                //check.Start();
-
-                //button1.Click += zoomIN;
-                //button2.Click += zoomOUT;
-
-                //slider1.ValueChanged += updateHistogram;
-                //playback.PlaybackStopped += closeMusic;
+ 
             }
 
         // Loads time-freq image for tab 1
@@ -371,11 +367,11 @@ namespace DigitalMusicAnalysis
 
             double[] pitches = new double[lengths.Count];
 
-            
+
 
             ParallelOptions options = new ParallelOptions
             {
-                MaxDegreeOfParallelism = 4
+                MaxDegreeOfParallelism = WorkerCount
             };
 
             Console.WriteLine($"noteStarts.Count = {noteStarts.Count}");
