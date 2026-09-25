@@ -8,9 +8,12 @@ namespace DigitalMusicAnalysis
         public float[][] timeFreqData;
         public int wSamp;
         public Complex[] twiddles;
+        public int WorkerCount;
 
         public timefreq(float[] x, int windowSamp)
         {
+            this.WorkerCount = 6;
+            
             int ii;
             double pi = 3.14159265;
             Complex i = Complex.ImaginaryOne;
@@ -48,8 +51,19 @@ namespace DigitalMusicAnalysis
                 timeFreqData[jj] = new float[cols];
             }
 
-            timeFreqData = stft(compX, wSamp);
-	
+            Stopwatch stftTimer = Stopwatch.StartNew();
+
+            timeFreqData = parallel_stft(compX, wSamp);
+            
+            stftTimer.Stop();
+
+            File.AppendAllText(
+                "stft_parallel_4_core.txt",
+                $"{stftTimer.Elapsed.TotalMilliseconds:F3} ms{Environment.NewLine}");
+            double elapsedMs = stftTimer.Elapsed.TotalMilliseconds;
+            Console.WriteLine($"STFT Time: {elapsedMs:F3} ms");
+
+
         }
 
         float[][] stft(Complex[] x, int wSamp)
@@ -103,6 +117,81 @@ namespace DigitalMusicAnalysis
             }
 
             return Y;
+        }
+        float[][] parallel_stft(Complex[] x, int wSamp)
+        {
+            int N = x.Length;
+
+            // FFT requires a power-of-two input size
+            if (N == 0 || (N & (N - 1)) != 0)
+            {
+                throw new ArgumentException(
+                    "FFT input length must be a power of two.");
+            }
+
+            // Copy input so original data is not modified
+            Complex[] data = new Complex[N];
+
+            int bits = (int)Math.Log(N, 2);
+
+            // Bit-reversal permutation
+            for (int i = 0; i < N; i++)
+            {
+                MaxDegreeOfParallelism = WorkerCount
+            };
+
+            // Process FFT one stage at a time
+            for (int size = 2; size <= N; size *= 2)
+            {
+                int halfSize = size / 2;
+
+            // STEP 1: Process each STFT window in parallel
+            Parallel.For(0, numberOfWindows, options, ii =>
+            {
+                // Each worker gets its own arrays
+                Complex[] temp = new Complex[wSamp];
+
+                for (int jj = 0; jj < wSamp; jj++)
+                {
+                    temp[jj] = x[ii * (wSamp / 2) + jj];
+                }
+
+                Complex[] tempFFT = fft_Iterative(temp);
+
+                        Complex twiddle = new Complex(
+                            Math.Cos(angle),
+                            Math.Sin(angle));
+
+                        int evenIndex = start + j;
+                        int oddIndex = evenIndex + halfSize;
+
+                        Complex even = data[evenIndex];
+                        Complex odd =
+                            data[oddIndex] * twiddle;
+
+                        // Butterfly operation
+                        data[evenIndex] = even + odd;
+                        data[oddIndex] = even - odd;
+                    }
+                }
+            }
+
+            return data;
+        }
+
+        private int ReverseBits(int value, int bits)
+        {
+            int reversed = 0;
+
+            for (int i = 0; i < bits; i++)
+            {
+                reversed =
+                    (reversed << 1) | (value & 1);
+
+                value >>= 1;
+            }
+
+            return reversed;
         }
 
         // Iterative radix-2 FFT for pitch detection

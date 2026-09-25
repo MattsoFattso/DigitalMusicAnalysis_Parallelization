@@ -16,7 +16,8 @@ using System.Diagnostics;
 
 
 namespace DigitalMusicAnalysis
-{
+{   
+    //PARALLEL BRANCH FOR METHOD 1 and 2
     public partial class MainWindow : Window
     {
         private WaveFileReader waveReader;
@@ -28,13 +29,14 @@ namespace DigitalMusicAnalysis
         private Complex[] twiddles;
         private Complex[] compX;
         private string filename;
+        private int WorkerCount;
         private enum pitchConv { C, Db, D, Eb, E, F, Gb, G, Ab, A, Bb, B };
         private double bpm = 70;
            
         // RESTRUCTURING FFT TO A ITERATIVE METHOD
         public MainWindow()
         {
-            InitializeComponent();
+                InitializeComponent();
 
             filename = @"C:\Users\matty\OneDrive\Documents\UNIVERSITY\Year 3 Sem 2\CAB401 Paralell Computing\MAIN PROJECT\CODE\music\Jupiter.wav";
 
@@ -368,21 +370,17 @@ namespace DigitalMusicAnalysis
 
                 Y = new Complex[nearest];
 
-                // COMPARE APPROACHES FOR ERROR
+            
 
-                //Stopwatch recursiveTimer = Stopwatch.StartNew();
+            ParallelOptions options = new ParallelOptions
+            {
+                MaxDegreeOfParallelism = 4
+            };
 
-                //Complex[] recursive = fft(compX, nearest);
-
-                //recursiveTimer.Stop();
-
-
-                //Stopwatch iterativeTimer = Stopwatch.StartNew();
-
-                Complex[] iterative = fft_Iterative(compX);
-
-                //iterativeTimer.Stop();
-
+            Console.WriteLine($"noteStarts.Count = {noteStarts.Count}");
+            Console.WriteLine($"noteStops.Count  = {noteStops.Count}");
+            Console.WriteLine($"lengths.Count    = {lengths.Count}");
+            Console.WriteLine($"pitches.Length   = {pitches.Length}");
 
                 ////Console.WriteLine(
                 ////    $"Recursive FFT: {recursiveTimer.Elapsed.TotalMilliseconds:F4} ms");
@@ -414,8 +412,9 @@ namespace DigitalMusicAnalysis
                 //Console.WriteLine(
                 //    $"Max absolute error: {maxAbsoluteError:E}");
 
-                //Console.WriteLine(
-                //    $"Max relative error: {maxRelativeError:E}");
+                // FFT result is also local
+                Complex[] localY =
+                    fft(localCompX, nearest, localTwiddles);
 
                 Y = iterative;
                 absY = new double[nearest];
@@ -800,7 +799,7 @@ namespace DigitalMusicAnalysis
 
         // FFT function for Pitch Detection (THIS IS THE RECURSIVE APPRAOCH)
 
-        private Complex[] fft(Complex[] x, int L)
+        private Complex[] fft(Complex[] x, int L, Complex[] twiddles)
         {
             int ii = 0;
             int kk = 0;
