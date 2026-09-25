@@ -11,6 +11,8 @@ using System.Threading;
 using System.Numerics;
 using NAudio.Wave;
 using System.Xml;
+using System;
+using System.Threading.Tasks;
 
 using System.Diagnostics;
 
@@ -195,6 +197,269 @@ namespace DigitalMusicAnalysis
 
         }
 
+        public class ParallelFFTWorkerPool : IDisposable
+        {
+            private readonly int workerCount;
+            private readonly Task[] workers;
+
+            // Synchronises workers after every FFT stage
+            private readonly Barrier stageBarrier;
+
+            // Used to wake workers when a new FFT is available
+            private readonly ManualResetEventSlim startSignal =
+                new ManualResetEventSlim(false);
+
+            // Used to tell FFT() that all workers have completed
+            private readonly CountdownEvent completionSignal;
+
+            // Current FFT data
+            private Complex[] data;
+            private int N;
+            private int bits;
+
+            // Used to stop workers when finished
+            private volatile bool stopping = false;
+
+
+            public ParallelFFTWorkerPool(int workerCount)
+            {
+                if (workerCount < 1)
+                    throw new ArgumentException(
+                        "Worker count must be at least 1.");
+
+                this.workerCount = workerCount;
+
+                workers = new Task[workerCount];
+
+                stageBarrier = new Barrier(workerCount);
+
+                completionSignal =
+                    new CountdownEvent(workerCount);
+
+                // ============================================
+                // CREATE WORKERS ONCE
+                // ============================================
+
+                for (int worker = 0;
+                     worker < workerCount;
+                     worker++)
+                {
+                    int workerId = worker;
+
+                    workers[worker] =
+                        Task.Factory.StartNew(
+                            () => WorkerLoop(workerId),
+                            TaskCreationOptions.LongRunning);
+                }
+            }
+
+
+            // ==================================================
+            // Worker loop
+            // ==================================================
+
+            private void WorkerLoop(int workerId)
+            {
+                while (true)
+                {
+                    // Wait until FFT() gives us work
+                    startSignal.Wait();
+
+                    if (stopping)
+                        return;
+
+                    // ==========================================
+                    // Process every FFT stage
+                    // ==========================================
+
+                    for (int stage = 1;
+                         stage <= bits;
+                         stage++)
+                    {
+                        int size = 1 << stage;
+                        int halfSize = size / 2;
+
+                        int butterflyCount = N / 2;
+
+                        // Each worker receives different
+                        // butterfly operations.
+                        //
+                        // Worker 0: 0, 4, 8, ...
+                        // Worker 1: 1, 5, 9, ...
+                        // etc.
+
+                        for (int butterfly = workerId;
+                             butterfly < butterflyCount;
+                             butterfly += workerCount)
+                        {
+                            int group =
+                                butterfly / halfSize;
+
+                            int j =
+                                butterfly % halfSize;
+
+                            int evenIndex =
+                                group * size + j;
+
+                            int oddIndex =
+                                evenIndex + halfSize;
+
+                            double angle =
+                                -2.0 * Math.PI *
+                                j / size;
+
+                            Complex twiddle =
+                                new Complex(
+                                    Math.Cos(angle),
+                                    Math.Sin(angle));
+
+                            Complex even =
+                                data[evenIndex];
+
+                            Complex odd =
+                                data[oddIndex] *
+                                twiddle;
+
+                            data[evenIndex] =
+                                even + odd;
+
+                            data[oddIndex] =
+                                even - odd;
+                        }
+
+                        // ======================================
+                        // STAGE BARRIER
+                        //
+                        // Nobody can begin the next stage until
+                        // every worker finishes this stage.
+                        // ======================================
+
+                        stageBarrier.SignalAndWait();
+                    }
+
+                    // Tell FFT() this worker has completed
+                    completionSignal.Signal();
+
+                    // Wait here until FFT() resets the signal
+                    // before looking for another FFT.
+                    while (startSignal.IsSet && !stopping)
+                    {
+                        Thread.Yield();
+                    }
+                }
+            }
+
+
+            // ==================================================
+            // Perform FFT using existing workers
+            // ==================================================
+
+            public Complex[] FFT(Complex[] input)
+            {
+                N = input.Length;
+
+                if (N == 0 ||
+                    (N & (N - 1)) != 0)
+                {
+                    throw new ArgumentException(
+                        "FFT input length must be a power of two.");
+                }
+
+                bits = (int)Math.Log(N, 2);
+
+                data = new Complex[N];
+
+
+                // ==============================================
+                // Sequential bit-reversal permutation
+                // ==============================================
+
+                for (int index = 0;
+                     index < N;
+                     index++)
+                {
+                    int reversed =
+                        ReverseBits(index, bits);
+
+                    data[reversed] =
+                        input[index];
+                }
+
+
+                // ==============================================
+                // Prepare completion counter
+                // ==============================================
+
+                completionSignal.Reset(workerCount);
+
+
+                // ==============================================
+                // Wake existing workers
+                // ==============================================
+
+                startSignal.Set();
+
+
+                // ==============================================
+                // Wait for all workers to complete the FFT
+                // ==============================================
+
+                completionSignal.Wait();
+
+
+                // Stop workers from immediately repeating
+                // the same FFT
+                startSignal.Reset();
+
+
+                return data;
+            }
+
+
+            // ==================================================
+            // Bit reversal
+            // ==================================================
+
+            private int ReverseBits(
+                int value,
+                int bits)
+            {
+                int reversed = 0;
+
+                for (int i = 0;
+                     i < bits;
+                     i++)
+                {
+                    reversed =
+                        (reversed << 1) |
+                        (value & 1);
+
+                    value >>= 1;
+                }
+
+                return reversed;
+            }
+
+
+            // ==================================================
+            // Shut down workers
+            // ==================================================
+
+            public void Dispose()
+            {
+                stopping = true;
+
+                // Wake workers so they can see stopping = true
+                startSignal.Set();
+
+                Task.WaitAll(workers);
+
+                stageBarrier.Dispose();
+                startSignal.Dispose();
+                completionSignal.Dispose();
+            }
+        }
+
         // Zoom In Button control
 
         private void zoomIN(object sender, RoutedEventArgs e)
@@ -344,7 +609,10 @@ namespace DigitalMusicAnalysis
                 lengths.Add(noteStops[ii] - noteStarts[ii]);
             }
 
-            for (int mm = 0; mm < lengths.Count; mm++)
+            using (ParallelFFTWorkerPool fftPool =
+                 new ParallelFFTWorkerPool(4))
+
+                for (int mm = 0; mm < lengths.Count; mm++)
             {
                 int nearest = (int)Math.Pow(2, Math.Ceiling(Math.Log(lengths[mm], 2)));
                 twiddles = new Complex[nearest];
@@ -366,11 +634,48 @@ namespace DigitalMusicAnalysis
                         compX[kk] = Complex.Zero;
                     }
                 }
-          
+
+                // ========================================
+                // Parallel iterative FFT
+                // ========================================
+
+                Stopwatch parallelTimer = Stopwatch.StartNew();
+
+        Complex[] parallelY = fftPool.FFT(compX); ;
+
+                parallelTimer.Stop();
+
+                double parallelTime =
+                    parallelTimer.Elapsed.TotalMilliseconds;
+
+
+                // ========================================
+                // Sequential iterative FFT
+                // ========================================
+
+                Stopwatch sequentialTimer = Stopwatch.StartNew();
+
+                Complex[] sequentialY = fft_Iterative(compX);
+
+                sequentialTimer.Stop();
+
+                double sequentialTime =
+                    sequentialTimer.Elapsed.TotalMilliseconds;
+
+
+                // ========================================
+                // Display results
+                // ========================================
+
+                Console.WriteLine(
+                    $"Parallel FFT: {parallelTime:F4} ms");
+
+                Console.WriteLine(
+                    $"Sequential FFT: {sequentialTime:F4} ms");
 
 
       
-                Y = fft_Iterative(compX);
+                Y = sequentialY;
 
                 absY = new double[nearest];
 
@@ -826,6 +1131,181 @@ namespace DigitalMusicAnalysis
             }
 
             return reversed;
+        }
+        private Complex[] fft_Iterative_Parallel(
+    Complex[] x,
+    int workerCount)
+        {
+            int N = x.Length;
+
+            if (N == 0 || (N & (N - 1)) != 0)
+            {
+                throw new ArgumentException(
+                    "FFT input length must be a power of two.");
+            }
+
+            Complex[] data = new Complex[N];
+
+            int bits = (int)Math.Log(N, 2);
+
+            // Bit-reversal remains sequential
+            for (int index = 0; index < N; index++)
+            {
+                int reversed = ReverseBits(index, bits);
+                data[reversed] = x[index];
+            }
+
+            workerCount = Math.Min(workerCount, N / 2);
+
+            // Synchronises workers between FFT stages
+            using (Barrier barrier = new Barrier(workerCount))
+            {
+                Task[] workers = new Task[workerCount];
+
+                // Create workers ONCE
+                for (int worker = 0;
+                     worker < workerCount;
+                     worker++)
+                {
+                    int workerId = worker;
+
+                    workers[worker] = Task.Run(() =>
+                    {
+                        // Every worker processes every stage
+                        for (int stage = 1;
+                             stage <= bits;
+                             stage++)
+                        {
+                            int size = 1 << stage;
+                            int halfSize = size / 2;
+
+                            int butterflyCount = N / 2;
+
+                            // This worker processes its share
+                            for (int butterfly = workerId;
+                                 butterfly < butterflyCount;
+                                 butterfly += workerCount)
+                            {
+                                int group =
+                                    butterfly / halfSize;
+
+                                int j =
+                                    butterfly % halfSize;
+
+                                int evenIndex =
+                                    group * size + j;
+
+                                int oddIndex =
+                                    evenIndex + halfSize;
+
+                                double angle =
+                                    -2.0 * Math.PI * j / size;
+
+                                Complex twiddle =
+                                    new Complex(
+                                        Math.Cos(angle),
+                                        Math.Sin(angle));
+
+                                Complex even =
+                                    data[evenIndex];
+
+                                Complex odd =
+                                    data[oddIndex] * twiddle;
+
+                                data[evenIndex] =
+                                    even + odd;
+
+                                data[oddIndex] =
+                                    even - odd;
+                            }
+
+                            // All workers MUST finish this stage
+                            // before anyone begins the next stage.
+                            barrier.SignalAndWait();
+                        }
+                    });
+                }
+
+                // Wait until all workers complete the FFT
+                Task.WaitAll(workers);
+            }
+
+            return data;
+        }
+
+        private Complex[] fft_Iterative_Parallel_barrier(Complex[] x, int workerCount)
+        {
+            int N = x.Length;
+
+            // FFT requires a power-of-two input size
+            if (N == 0 || (N & (N - 1)) != 0)
+            {
+                throw new ArgumentException(
+                    "FFT input length must be a power of two.");
+            }
+
+            Complex[] data = new Complex[N];
+
+            int bits = (int)Math.Log(N, 2);
+
+            // Bit-reversal permutation remains sequential
+            for (int i = 0; i < N; i++)
+            {
+                int reversed = ReverseBits(i, bits);
+                data[reversed] = x[i];
+            }
+
+            ParallelOptions options = new ParallelOptions
+            {
+                MaxDegreeOfParallelism = workerCount
+            };
+
+            // Stages must remain sequential
+            for (int size = 2; size <= N; size *= 2)
+            {
+                int currentSize = size;
+                int halfSize = currentSize / 2;
+
+                // Every stage contains N / 2 butterflies
+                int butterflyCount = N / 2;
+
+                // Butterflies within this stage are independent
+                Parallel.For(0, butterflyCount, options, butterfly =>
+                {
+                    // Determine which group this butterfly belongs to
+                    int group = butterfly / halfSize;
+
+                    // Position of butterfly within that group
+                    int j = butterfly % halfSize;
+
+                    int evenIndex =
+                        group * currentSize + j;
+
+                    int oddIndex =
+                        evenIndex + halfSize;
+
+                    double angle =
+                        -2.0 * Math.PI * j / currentSize;
+
+                    Complex twiddle = new Complex(
+                        Math.Cos(angle),
+                        Math.Sin(angle));
+
+                    Complex even = data[evenIndex];
+
+                    Complex odd =
+                        data[oddIndex] * twiddle;
+
+                    // Butterfly operation
+                    data[evenIndex] = even + odd;
+                    data[oddIndex] = even - odd;
+                });
+
+                // Parallel.For must finish before execution continues,
+                // providing the required synchronization between stages.
+            }
+
+            return data;
         }
 
         private musicNote[] readXML(string filename)
