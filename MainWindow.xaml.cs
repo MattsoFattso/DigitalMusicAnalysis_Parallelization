@@ -368,46 +368,12 @@ namespace DigitalMusicAnalysis
                         compX[kk] = Complex.Zero;
                     }
                 }
-
-                Y = new Complex[nearest];
-
-            
-
-                ////Console.WriteLine(
-                ////    $"Recursive FFT: {recursiveTimer.Elapsed.TotalMilliseconds:F4} ms");
-
-                //Console.WriteLine(
-                //    $"Iterative FFT: {iterativeTimer.Elapsed.TotalMilliseconds:F4} ms");
+          
 
 
-                double maxAbsoluteError = 0;
-                double maxRelativeError = 0;
+      
+                Y = fft_Iterative(compX);
 
-                //for (int k = 0; k < recursive.Length; k++)
-                //{
-                //    double error =
-                //        Complex.Abs(recursive[k] - iterative[k]);
-
-                //    maxAbsoluteError = Math.Max(maxAbsoluteError, error);
-
-                //    double magnitude = Complex.Abs(recursive[k]);
-
-                //    if (magnitude > 1e-12)
-                //    {
-                //        double relativeError = error / magnitude;
-                //        maxRelativeError =
-                //            Math.Max(maxRelativeError, relativeError);
-                //    }
-                //}
-
-                //Console.WriteLine(
-                //    $"Max absolute error: {maxAbsoluteError:E}");
-
-                // FFT result is also local
-                Complex[] localY =
-                    fft(localCompX, nearest, localTwiddles);
-
-                Y = iterative;
                 absY = new double[nearest];
 
                 double maximum = 0;
@@ -790,51 +756,7 @@ namespace DigitalMusicAnalysis
 
         // FFT function for Pitch Detection (THIS IS THE RECURSIVE APPRAOCH)
 
-        private Complex[] fft(Complex[] x, int L, Complex[] twiddles)
-        {
-            int ii = 0;
-            int kk = 0;
-            int N = x.Length;
-
-            Complex[] Y = new Complex[N];
-
-            if (N == 1)
-            {
-                Y[0] = x[0];
-            }
-            else
-            {
-
-                Complex[] E = new Complex[N / 2];
-                Complex[] O = new Complex[N / 2];
-                Complex[] even = new Complex[N / 2];
-                Complex[] odd = new Complex[N / 2];
-
-                for (ii = 0; ii < N; ii++)
-                {
-
-                    if (ii % 2 == 0)
-                    {
-                        even[ii / 2] = x[ii];
-                    }
-                    if (ii % 2 == 1)
-                    {
-                        odd[(ii - 1) / 2] = x[ii];
-                    }
-                }
-
-                E = fft(even, L);
-                O = fft(odd, L);
-
-                for (kk = 0; kk < N; kk++)
-                {
-                    Y[kk] = E[(kk % (N / 2))] + O[(kk % (N / 2))] * twiddles[kk * (L / N)];
-                }
-            }
-
-            return Y;
-        }
-
+     
         // Iterative radix-2 FFT for pitch detection
         private Complex[] fft_Iterative(Complex[] x)
         {
