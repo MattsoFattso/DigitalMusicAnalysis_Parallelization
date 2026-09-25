@@ -373,16 +373,6 @@ namespace DigitalMusicAnalysis
 
             
 
-            ParallelOptions options = new ParallelOptions
-            {
-                MaxDegreeOfParallelism = 4
-            };
-
-            Console.WriteLine($"noteStarts.Count = {noteStarts.Count}");
-            Console.WriteLine($"noteStops.Count  = {noteStops.Count}");
-            Console.WriteLine($"lengths.Count    = {lengths.Count}");
-            Console.WriteLine($"pitches.Length   = {pitches.Length}");
-
                 ////Console.WriteLine(
                 ////    $"Recursive FFT: {recursiveTimer.Elapsed.TotalMilliseconds:F4} ms");
 
