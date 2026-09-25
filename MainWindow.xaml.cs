@@ -29,7 +29,6 @@ namespace DigitalMusicAnalysis
         private Complex[] twiddles;
         private Complex[] compX;
         private string filename;
-        private int WorkerCount;
         private enum pitchConv { C, Db, D, Eb, E, F, Gb, G, Ab, A, Bb, B };
         private double bpm = 70;
            
@@ -42,10 +41,9 @@ namespace DigitalMusicAnalysis
 
             string xmlfile = @"C:\Users\matty\OneDrive\Documents\UNIVERSITY\Year 3 Sem 2\CAB401 Paralell Computing\MAIN PROJECT\CODE\music\Jupiter.xml";
 
-            // start timer
             loadWave(filename);
 
-            loadWave(filename);
+            // start timer
 
             Stopwatch timer = Stopwatch.StartNew();
 
@@ -62,7 +60,7 @@ namespace DigitalMusicAnalysis
                 $"Elapsed Time: {timer.Elapsed.TotalMilliseconds:F3} ms");
 
             File.AppendAllText(
-          "benchmark.txt",
+          "Sequential_ITERATIVE FFT",
           $"Sequential,{timer.Elapsed.TotalMilliseconds:F3}\n");
 
         }
