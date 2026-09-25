@@ -17,7 +17,7 @@ namespace DigitalMusicAnalysis
         {
             // DEFINE Parallel Worker Coutn for This Code
 
-            WorkerCount = 2;
+            WorkerCount = 4;
 
             int ii;
             double pi = 3.14159265;
@@ -151,7 +151,7 @@ namespace DigitalMusicAnalysis
                     temp[jj] = x[ii * (wSamp / 2) + jj];
                 }
 
-                Complex[] tempFFT = fft(temp);
+                Complex[] tempFFT = fft_Iterative(temp);
 
                 // Each worker writes to its own column of Y
                 for (int kk = 0; kk < wSamp / 2; kk++)
@@ -186,6 +186,80 @@ namespace DigitalMusicAnalysis
 
             return Y;
         }
+
+        // Iterative radix-2 FFT for pitch detection
+        private Complex[] fft_Iterative(Complex[] x)
+        {
+            int N = x.Length;
+
+            // FFT requires a power-of-two input size
+            if (N == 0 || (N & (N - 1)) != 0)
+            {
+                throw new ArgumentException(
+                    "FFT input length must be a power of two.");
+            }
+
+            // Copy input so original data is not modified
+            Complex[] data = new Complex[N];
+
+            int bits = (int)Math.Log(N, 2);
+
+            // Bit-reversal permutation
+            for (int i = 0; i < N; i++)
+            {
+                int reversed = ReverseBits(i, bits);
+                data[reversed] = x[i];
+            }
+
+            // Process FFT one stage at a time
+            for (int size = 2; size <= N; size *= 2)
+            {
+                int halfSize = size / 2;
+
+                // Process each group within this stage
+                for (int start = 0; start < N; start += size)
+                {
+                    for (int j = 0; j < halfSize; j++)
+                    {
+                        double angle =
+                            -2.0 * Math.PI * j / size;
+
+                        Complex twiddle = new Complex(
+                            Math.Cos(angle),
+                            Math.Sin(angle));
+
+                        int evenIndex = start + j;
+                        int oddIndex = evenIndex + halfSize;
+
+                        Complex even = data[evenIndex];
+                        Complex odd =
+                            data[oddIndex] * twiddle;
+
+                        // Butterfly operation
+                        data[evenIndex] = even + odd;
+                        data[oddIndex] = even - odd;
+                    }
+                }
+            }
+
+            return data;
+        }
+
+        private int ReverseBits(int value, int bits)
+        {
+            int reversed = 0;
+
+            for (int i = 0; i < bits; i++)
+            {
+                reversed =
+                    (reversed << 1) | (value & 1);
+
+                value >>= 1;
+            }
+
+            return reversed;
+        }
+
 
         Complex[] fft(Complex[] x)
         {
