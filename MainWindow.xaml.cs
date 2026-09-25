@@ -54,10 +54,13 @@ namespace DigitalMusicAnalysis
 
             timer.Stop();
 
+            Console.WriteLine($"Sequential,{timer.Elapsed.TotalMilliseconds:F3}");
+
 
             File.AppendAllText(
           "Sequential Timing.txt",
           $"Sequential,{timer.Elapsed.TotalMilliseconds:F3}\n");
+
             //loadImage();
             // loadHistogram();
             //playBack();
