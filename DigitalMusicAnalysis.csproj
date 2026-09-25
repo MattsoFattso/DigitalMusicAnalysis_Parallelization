@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="ConcurrencyVisualizer" Version="3.0.0" />
     <PackageReference Include="NAudio" Version="1.10.0" />
   </ItemGroup>
 

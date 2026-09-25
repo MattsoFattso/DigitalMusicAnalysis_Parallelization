@@ -14,6 +14,10 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using System.Xml;
+using System.Diagnostics.Tracing;
+using Microsoft.ConcurrencyVisualizer.Instrumentation;
+
+
 
 
 namespace DigitalMusicAnalysis
@@ -33,6 +37,23 @@ namespace DigitalMusicAnalysis
         private enum pitchConv { C, Db, D, Eb, E, F, Gb, G, Ab, A, Bb, B };
         private double bpm = 70;
 
+        [EventSource(Name = "DigitalMusicAnalysis")]
+        public sealed class PerfEvents : EventSource
+        {
+            public static readonly PerfEvents Log = new PerfEvents();
+
+            [Event(1)]
+            public void SectionStart(string name)
+            {
+                WriteEvent(1, name);
+            }
+
+            [Event(2)]
+            public void SectionEnd(string name)
+            {
+                WriteEvent(2, name);
+            }
+        }
         public MainWindow()
         {
             // Worker Count For Parallel Components
@@ -52,16 +73,29 @@ namespace DigitalMusicAnalysis
 
                 Stopwatch timer = Stopwatch.StartNew();
 
+                Span stftSpan = Markers.EnterSpan("STFT");
+
                 freqDomain();
+
+                stftSpan.Leave();
+
+
                 sheetmusic = readXML(xmlfile);
+
+
+                Span onsetSpan = Markers.EnterSpan("Onset Detection");
+
                 onsetDetection();
+
+                onsetSpan.Leave();
+
 
                 timer.Stop();
 
                 Console.WriteLine(
                     $"FULL MATHEMATICAL COMPONENT: {timer.Elapsed.TotalMilliseconds:F3} ms");
- 
-            }
+
+        }
 
         // Loads time-freq image for tab 1
 
@@ -386,17 +420,7 @@ namespace DigitalMusicAnalysis
                     2,
                     Math.Ceiling(Math.Log(lengths[mm], 2)));
 
-                // Local twiddle array - unique to this note
-                Complex[] localTwiddles = new Complex[nearest];
-
-                for (int ll = 0; ll < nearest; ll++)
-                {
-                    double a = 2 * pi * ll / (double)nearest;
-
-                    localTwiddles[ll] =
-                        Complex.Pow(Complex.Exp(-i), (float)a);
-                }
-
+    
                 // Local FFT input - unique to this note
                 Complex[] localCompX = new Complex[nearest];
 
