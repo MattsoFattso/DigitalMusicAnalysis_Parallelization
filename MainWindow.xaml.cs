@@ -43,6 +43,7 @@ namespace DigitalMusicAnalysis
             string xmlfile = @"C:\Users\matty\OneDrive\Documents\UNIVERSITY\Year 3 Sem 2\CAB401 Paralell Computing\MAIN PROJECT\CODE\music\Jupiter.xml";
 
             // start timer
+            loadWave(filename);
 
             loadWave(filename);
 
