@@ -18,6 +18,7 @@ using System.Diagnostics.Tracing;
 using Microsoft.ConcurrencyVisualizer.Instrumentation;
 
 using System.Diagnostics;
+using Path = System.IO.Path;
 
 
 
@@ -78,11 +79,11 @@ namespace DigitalMusicAnalysis
             sheetmusic = readXML(xmlfile);
 
 
-                Span onsetSpan = Markers.EnterSpan("Onset Detection");
+              //  Span onsetSpan = Markers.EnterSpan("Onset Detection");
 
                 onsetDetection();
 
-                onsetSpan.Leave();
+             //   onsetSpan.Leave();
 
 
                 timer.Stop();
@@ -93,6 +94,231 @@ namespace DigitalMusicAnalysis
         }
 
         // Loads time-freq image for tab 1
+
+        private void RunCorrectnessTests(
+    List<int> noteStarts,
+    List<int> noteStops,
+    double[] pitches,
+    string[] alignedStrings)
+        {
+            // Locate reference_output in the main project directory
+            string projectDirectory = Path.GetFullPath(
+                Path.Combine(AppContext.BaseDirectory, @"..\..\..\"));
+
+            string referenceFolder =
+                Path.Combine(projectDirectory, "reference_output");
+
+            Console.WriteLine("\n========== CORRECTNESS TESTS ==========");
+
+            // ============================================================
+            // 1. STFT TEST
+            // ============================================================
+
+            string stftPath =
+                Path.Combine(referenceFolder, "stft.txt");
+
+            string[] stftLines = File.ReadAllLines(stftPath);
+
+            bool stftDimensionsMatch =
+                stftLines.Length == stftRep.timeFreqData.Length;
+
+            double maxStftError = 0.0;
+            long stftValuesCompared = 0;
+
+            if (stftDimensionsMatch)
+            {
+                for (int freq = 0;
+                     freq < stftRep.timeFreqData.Length;
+                     freq++)
+                {
+                    string[] referenceValues =
+                        stftLines[freq].Split(',');
+
+                    if (referenceValues.Length !=
+                        stftRep.timeFreqData[freq].Length)
+                    {
+                        stftDimensionsMatch = false;
+                        break;
+                    }
+
+                    for (int window = 0;
+                         window < stftRep.timeFreqData[freq].Length;
+                         window++)
+                    {
+                        double reference =
+                            double.Parse(referenceValues[window]);
+
+                        double parallel =
+                            stftRep.timeFreqData[freq][window];
+
+                        double error =
+                            Math.Abs(reference - parallel);
+
+                        if (error > maxStftError)
+                        {
+                            maxStftError = error;
+                        }
+
+                        stftValuesCompared++;
+                    }
+                }
+            }
+
+            bool stftMatch =
+                stftDimensionsMatch &&
+                maxStftError <= 0.001;
+
+            Console.WriteLine(
+                $"STFT: {(stftMatch ? "PASS" : "FAIL")}");
+
+            Console.WriteLine(
+                $"  Values compared: {stftValuesCompared}");
+
+            Console.WriteLine(
+                $"  Maximum absolute error: {maxStftError}");
+
+
+            // ============================================================
+            // 2. NOTE START TEST
+            // ============================================================
+
+            int[] referenceStarts =
+                File.ReadAllLines(
+                    Path.Combine(referenceFolder, "noteStarts.txt"))
+                .Select(int.Parse)
+                .ToArray();
+
+            bool startsMatch =
+                referenceStarts.SequenceEqual(noteStarts);
+
+            Console.WriteLine(
+                $"Note Starts: {(startsMatch ? "PASS" : "FAIL")}");
+
+            Console.WriteLine(
+                $"  Sequential count: {referenceStarts.Length}");
+
+            Console.WriteLine(
+                $"  Parallel count: {noteStarts.Count}");
+
+
+            // ============================================================
+            // 3. NOTE STOP TEST
+            // ============================================================
+
+            int[] referenceStops =
+                File.ReadAllLines(
+                    Path.Combine(referenceFolder, "noteStops.txt"))
+                .Select(int.Parse)
+                .ToArray();
+
+            bool stopsMatch =
+                referenceStops.SequenceEqual(noteStops);
+
+            Console.WriteLine(
+                $"Note Stops: {(stopsMatch ? "PASS" : "FAIL")}");
+
+            Console.WriteLine(
+                $"  Sequential count: {referenceStops.Length}");
+
+            Console.WriteLine(
+                $"  Parallel count: {noteStops.Count}");
+
+
+            // ============================================================
+            // 4. PITCH TEST
+            // ============================================================
+
+            double[] referencePitches =
+                File.ReadAllLines(
+                    System.IO.Path.Combine(referenceFolder, "pitches.txt"))
+                .Select(double.Parse)
+                .ToArray();
+
+            bool pitchCountMatch =
+                referencePitches.Length == pitches.Length;
+
+            double maxPitchError = 0.0;
+
+            if (pitchCountMatch)
+            {
+                for (int i = 0; i < pitches.Length; i++)
+                {
+                    double error =
+                        Math.Abs(referencePitches[i] - pitches[i]);
+
+                    if (error > maxPitchError)
+                    {
+                        maxPitchError = error;
+                    }
+                }
+            }
+
+            bool pitchesMatch =
+                pitchCountMatch &&
+                maxPitchError <= 0.001;
+
+            Console.WriteLine(
+                $"Pitches: {(pitchesMatch ? "PASS" : "FAIL")}");
+
+            Console.WriteLine(
+                $"  Sequential count: {referencePitches.Length}");
+
+            Console.WriteLine(
+                $"  Parallel count: {pitches.Length}");
+
+            Console.WriteLine(
+                $"  Maximum absolute error: {maxPitchError}");
+
+
+            // ============================================================
+            // 5. FINAL RESULT TEST
+            // ============================================================
+
+            string[] referenceFinal =
+                File.ReadAllLines(
+                    Path.Combine(referenceFolder, "finalResult.txt"));
+
+            bool finalMatch =
+                referenceFinal.Length == alignedStrings.Length;
+
+            if (finalMatch)
+            {
+                for (int i = 0;
+                     i < alignedStrings.Length;
+                     i++)
+                {
+                    if (referenceFinal[i].TrimEnd() !=
+                        alignedStrings[i].TrimEnd())
+                    {
+                        finalMatch = false;
+                        break;
+                    }
+                }
+            }
+
+            Console.WriteLine(
+                $"Final Result: {(finalMatch ? "PASS" : "FAIL")}");
+
+
+            // ============================================================
+            // OVERALL RESULT
+            // ============================================================
+
+            bool allPassed =
+                stftMatch &&
+                startsMatch &&
+                stopsMatch &&
+                pitchesMatch &&
+                finalMatch;
+
+            Console.WriteLine("---------------------------------------");
+
+            Console.WriteLine(
+                $"OVERALL: {(allPassed ? "PASS" : "FAIL")}");
+
+            Console.WriteLine(
+                "=======================================\n");
+        }
 
         private void loadImage()
         {
@@ -497,6 +723,7 @@ namespace DigitalMusicAnalysis
                 }
             });
 
+
             onsetDetection_timer.Stop();
 
             Console.WriteLine(
@@ -602,6 +829,15 @@ namespace DigitalMusicAnalysis
             string[] alignedStrings = new string[2];
 
             alignedStrings = stringMatch(sheetPitchArray, notePitchArray);
+
+            // RUN FINAL CORRECTED TEST
+
+
+    //        RunCorrectnessTests(
+    //noteStarts,
+    //noteStops,
+    //pitches,
+    //alignedStrings);
 
             musicNote[] alignedStaffArray = new musicNote[alignedStrings[0].Length / 2];
             musicNote[] alignedNoteArray = new musicNote[alignedStrings[1].Length / 2];
