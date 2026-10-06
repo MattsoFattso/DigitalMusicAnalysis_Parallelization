@@ -17,6 +17,7 @@ using System.Xml;
 using System.Diagnostics.Tracing;
 using Microsoft.ConcurrencyVisualizer.Instrumentation;
 
+using System.Diagnostics;
 
 
 
@@ -73,14 +74,9 @@ namespace DigitalMusicAnalysis
 
                 Stopwatch timer = Stopwatch.StartNew();
 
-                Span stftSpan = Markers.EnterSpan("STFT");
-
-                freqDomain();
-
-                stftSpan.Leave();
-
-
-                sheetmusic = readXML(xmlfile);
+            freqDomain();
+            sheetmusic = readXML(xmlfile);
+            onsetDetection();  /// Contains Maindow FFT and also String Match components
 
 
                 Span onsetSpan = Markers.EnterSpan("Onset Detection");
@@ -124,6 +120,7 @@ namespace DigitalMusicAnalysis
         }
 
         // Loads Histogram for tab 2
+
 
         private void loadHistogram()
         {
@@ -636,13 +633,13 @@ namespace DigitalMusicAnalysis
                 }
             }
 
-            // STAFF TAB DISPLAY
+    //        // STAFF TAB DISPLAY
 
-    //        displayStaff(
-    //alignedNoteArray,
-    //alignedStaffArray,
-    //sheetBrush,
-    //ErrorBrush);
+            //        displayStaff(
+            //alignedNoteArray,
+            //alignedStaffArray,
+            //sheetBrush,
+            //ErrorBrush);
 
 
 
