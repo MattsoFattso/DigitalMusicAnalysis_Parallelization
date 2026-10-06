@@ -60,7 +60,7 @@ namespace DigitalMusicAnalysis
         {
             // Worker Count For Parallel Components
 
-            WorkerCount = 4;
+            WorkerCount = 5;
 
                 InitializeComponent();
 
@@ -90,6 +90,11 @@ namespace DigitalMusicAnalysis
 
                 Console.WriteLine(
                     $"FULL MATHEMATICAL COMPONENT: {timer.Elapsed.TotalMilliseconds:F3} ms");
+
+            // Append timing to text file
+            File.AppendAllText(
+                "5 CORES.txt",
+                $"{timer.Elapsed.TotalMilliseconds:F3}{Environment.NewLine}");
 
         }
 
@@ -665,6 +670,7 @@ namespace DigitalMusicAnalysis
                     fft_Iterative(localCompX);
 
                 // Magnitudes are local
+
                 double[] localAbsY = new double[nearest];
 
                 double maximum = 0;
@@ -680,6 +686,7 @@ namespace DigitalMusicAnalysis
                         maxInd = jj;
                     }
                 }
+
 
                 // Existing harmonic correction
                 for (int div = 6; div > 1; div--)
@@ -705,6 +712,42 @@ namespace DigitalMusicAnalysis
                         }
                     }
                 }
+
+                for (int jj = 0; jj < localY.Length; jj++)
+                {
+                    double magnitude = localY[jj].Magnitude;
+
+                    if (magnitude > maximum)
+                    {
+                        maximum = magnitude;
+                        maxInd = jj;
+                    }
+                }
+
+                //// REDUCE MEMORY MAPPING
+
+                //for (int div = 6; div > 1; div--)
+                //{
+                //    int harmonicIndex;
+
+                //    if (maxInd > nearest / 2)
+                //    {
+                //        harmonicIndex = (nearest - maxInd) / div;
+                //    }
+                //    else
+                //    {
+                //        harmonicIndex = maxInd / div;
+                //    }
+
+                //    double harmonicMagnitude = localY[harmonicIndex].Magnitude;
+                //    double maxMagnitude = localY[maxInd].Magnitude;
+
+                //    if (harmonicMagnitude / maxMagnitude > 0.10)
+                //    {
+                //        maxInd = harmonicIndex;
+                //    }
+                //}
+
 
                 // Unique output index - no pitches.Add()
                 if (maxInd > nearest / 2)
@@ -1580,10 +1623,10 @@ namespace DigitalMusicAnalysis
                 jj = jj - 1;
             }
 
-            System.Console.Out.Write("\n\n----------------  String Matching ------------------\n\n");
+            //System.Console.Out.Write("\n\n----------------  String Matching ------------------\n\n");
 
-            System.Console.Out.Write(AlignA + "\n");
-            System.Console.Out.Write(AlignB + "\n");
+            //System.Console.Out.Write(AlignA + "\n");
+            //System.Console.Out.Write(AlignB + "\n");
 
             string[] returnArray = new string[2];
 

@@ -17,7 +17,7 @@ namespace DigitalMusicAnalysis
         {
             // DEFINE Parallel Worker Coutn for This Code
 
-            WorkerCount = 4;
+            WorkerCount = 5;
 
             int ii;
             double pi = 3.14159265;
