@@ -76,7 +76,6 @@ namespace DigitalMusicAnalysis
 
             freqDomain();
             sheetmusic = readXML(xmlfile);
-            onsetDetection();  /// Contains Maindow FFT and also String Match components
 
 
                 Span onsetSpan = Markers.EnterSpan("Onset Detection");
